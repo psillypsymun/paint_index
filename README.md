@@ -89,18 +89,61 @@ rm paints.db
 npm run import-data
 ```
 
-## Deployment
+## Automatic Backups to GitHub
 
-For free hosting options:
-- **Replit**: Supports Node.js, great for quick deployments
-- **Railway.app**: Free tier available, easy setup
-- **Render**: Free tier with auto-deploy from GitHub
-- **Heroku**: Paid but very straightforward
+The app can automatically push backups to your GitHub repository every 6 months!
 
-When deploying:
-1. Set the `PAINT_PASSPHRASE` environment variable in your hosting provider
-2. The app will work with any cloud Node.js host
-3. Consider adding a process to backup the `paints.db` file regularly
+### Setup Instructions
+
+#### 1. Create a GitHub Personal Access Token
+
+1. Go to **github.com** and log in
+2. Click your profile → **Settings** → **Developer settings** → **Personal access tokens** → **Tokens (classic)**
+3. Click **Generate new token (classic)**
+4. Give it a name: `paint-app-backup`
+5. Check only: **repo** (Full control of private repositories)
+6. Click **Generate token**
+7. **Copy the token** (you'll only see it once!)
+
+#### 2. Deploy to Render with Backups
+
+1. Push your code to GitHub (see below)
+2. Go to **render.com** and sign up/log in
+3. Click **New +** → **Web Service**
+4. Connect your GitHub account and select `paint-app` repo
+5. Fill in the form:
+   - **Name**: paint-app
+   - **Runtime**: Node
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+6. Scroll to **Environment** and add:
+   ```
+   PAINT_PASSPHRASE = your-secure-passphrase-here
+   GITHUB_REPO = YOUR-USERNAME/paint-app
+   GITHUB_TOKEN = (paste your token from step 1)
+   ```
+7. Click **Create Web Service**
+8. Render will deploy automatically from GitHub!
+
+#### 3. Push Your Code to GitHub
+
+```bash
+cd ~/Downloads/work
+git init
+git add .
+git commit -m "Initial commit: Paint app with auto-backups"
+git branch -M main
+git remote add origin https://github.com/YOUR-USERNAME/paint-app.git
+git push -u origin main
+```
+
+### How Automatic Backups Work
+
+- ✅ Every 6 months, the app creates a backup automatically
+- ✅ Backup is pushed to your GitHub repo in a `backups/` folder
+- ✅ You can download any backup anytime from the Admin Panel
+- ✅ Full version history on GitHub - can restore from any point
+- ✅ Completely automatic - nothing to do!
 
 ## Project Structure
 

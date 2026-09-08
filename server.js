@@ -4,10 +4,16 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const cron = require('node-cron');
 const fs = require('fs');
+const simpleGit = require('simple-git');
 
 const app = express();
 const PORT = 3000;
 const PASSPHRASE = process.env.PAINT_PASSPHRASE || 'paintapp123'; // Change this to your passphrase
+
+// GitHub backup configuration
+const GITHUB_REPO = process.env.GITHUB_REPO; // e.g., YOUR-USERNAME/paint-app
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN; // Personal access token
+const PUSH_BACKUPS_TO_GITHUB = GITHUB_REPO && GITHUB_TOKEN; // Only if both are set
 
 // Backup configuration
 const backupsDir = path.join(__dirname, 'backups');
@@ -219,6 +225,31 @@ app.get('/api/admin/export-csv', (req, res) => {
 
 // Backup Management
 
+async function pushBackupToGithub(backupPath, backupFileName) {
+  if (!PUSH_BACKUPS_TO_GITHUB) {
+    return; // GitHub not configured
+  }
+
+  try {
+    const git = simpleGit();
+    const remoteUrl = `https://${GITHUB_TOKEN}@github.com/${GITHUB_REPO}.git`;
+
+    // Add the backup file
+    await git.add(backupPath);
+
+    // Commit
+    await git.commit(`Auto-backup: ${backupFileName}`, ['--no-verify']);
+
+    // Push (with token in URL for authentication)
+    await git.push([remoteUrl, 'main'], ['--quiet']);
+
+    console.log(`✓ Backup pushed to GitHub: ${backupFileName}`);
+  } catch (err) {
+    console.error('GitHub push error:', err.message);
+    // Don't reject - local backup still exists
+  }
+}
+
 function createBackup() {
   return new Promise((resolve, reject) => {
     db.all('SELECT * FROM paints ORDER BY building, paint_color', (err, rows) => {
@@ -242,6 +273,14 @@ function createBackup() {
           reject(err);
         } else {
           console.log(`✓ Backup created: ${backupFileName}`);
+
+          // Try to push to GitHub (non-blocking)
+          if (PUSH_BACKUPS_TO_GITHUB) {
+            pushBackupToGithub(backupPath, backupFileName).catch(err => {
+              console.error('Failed to push backup to GitHub:', err.message);
+            });
+          }
+
           resolve(backupPath);
         }
       });
