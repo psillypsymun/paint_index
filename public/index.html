@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paint Index - Paint Management System</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Login Screen -->
+    <div id="loginScreen" class="screen active">
+      <div class="login-box">
+        <h1>Paint Index</h1>
+        <p class="subtitle">Paint Management System</p>
+        <form id="loginForm" onsubmit="login(event)">
+          <input
+            type="password"
+            id="passphraseInput"
+            placeholder="Enter passphrase"
+            required
+            autocomplete="off"
+          >
+          <button type="submit">Enter</button>
+        </form>
+        <p id="loginError" class="error" style="display:none;"></p>
+      </div>
+    </div>
+
+    <!-- Main Menu Screen -->
+    <div id="menuScreen" class="screen">
+      <header>
+        <h1>Paint Index</h1>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+      </header>
+      <main class="menu-container">
+        <h2>What would you like to do?</h2>
+        <div class="button-group">
+          <button class="menu-button" onclick="showScreen('entryScreen')">
+            <span class="icon">➕</span>
+            <span>Add New Paint</span>
+          </button>
+          <button class="menu-button" onclick="showScreen('searchScreen')">
+            <span class="icon">🔍</span>
+            <span>Search Paints</span>
+          </button>
+          <button class="menu-button" onclick="loadAndShowAllPaints()">
+            <span class="icon">📋</span>
+            <span>View All Paints</span>
+          </button>
+          <button class="menu-button" onclick="showScreen('adminScreen')">
+            <span class="icon">⚙️</span>
+            <span>Admin Panel</span>
+          </button>
+        </div>
+      </main>
+    </div>
+
+    <!-- Paint Entry Form Screen -->
+    <div id="entryScreen" class="screen">
+      <header>
+        <button class="back-btn" onclick="showScreen('menuScreen')">← Back</button>
+        <h1>Add New Paint</h1>
+        <div style="width: 44px;"></div>
+      </header>
+      <main class="form-container">
+        <form id="paintForm" onsubmit="submitPaint(event)">
+          <div class="form-group">
+            <label for="building">Building *</label>
+            <select id="building" required onchange="updateBuildingList()">
+              <option value="">Select a building</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="paintName">Paint Name/Color *</label>
+            <input type="text" id="paintName" placeholder="e.g., Agreeable Gray" required>
+          </div>
+
+          <div class="form-group">
+            <label>Is this a custom color? *</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="customColor" value="no" checked onchange="toggleCustomColor()">
+                No
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="customColor" value="yes" onchange="toggleCustomColor()">
+                Yes
+              </label>
+            </div>
+          </div>
+
+          <div id="orderNumberGroup" class="form-group" style="display:none;">
+            <label for="orderNumber">Order Number</label>
+            <input type="text" id="orderNumber" placeholder="e.g., 0238967">
+          </div>
+
+          <div class="form-group">
+            <label for="paintLine">Paint Line *</label>
+            <select id="paintLine" required onchange="updatePaintLineList()">
+              <option value="">Select paint line</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="sheen">Sheen/Finish *</label>
+            <select id="sheen" required onchange="updateSheenList()">
+              <option value="">Select sheen</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="location">Area in Building *</label>
+            <input type="text" id="location" placeholder="e.g., Halls, Doorframes, etc." required>
+          </div>
+
+          <div class="form-group">
+            <label for="notes">Notes (Optional)</label>
+            <textarea id="notes" placeholder="Any additional notes..."></textarea>
+          </div>
+
+          <button type="submit" class="submit-btn">Add Paint Entry</button>
+        </form>
+        <div id="entrySuccess" class="success-message" style="display:none;">
+          ✓ Paint entry added successfully!
+        </div>
+      </main>
+    </div>
+
+    <!-- Search/View Screen -->
+    <div id="searchScreen" class="screen">
+      <header>
+        <button class="back-btn" onclick="showScreen('menuScreen')">← Back</button>
+        <h1>Search Paints</h1>
+        <div style="width: 44px;"></div>
+      </header>
+      <main class="search-container">
+        <div class="search-tabs">
+          <button class="tab-btn active" onclick="switchSearchTab('color')">By Color</button>
+          <button class="tab-btn" onclick="switchSearchTab('building')">By Building</button>
+        </div>
+
+        <div id="colorTab" class="tab-content active">
+          <input
+            type="text"
+            id="colorSearch"
+            placeholder="Search by paint color or name..."
+            onkeyup="searchPaints('color')"
+          >
+        </div>
+
+        <div id="buildingTab" class="tab-content">
+          <input
+            type="text"
+            id="buildingSearch"
+            placeholder="Search by building..."
+            onkeyup="searchPaints('building')"
+          >
+        </div>
+
+        <div id="resultsContainer" class="results-container">
+          <p class="placeholder">Start typing to search...</p>
+        </div>
+      </main>
+    </div>
+
+    <!-- View All Paints Screen -->
+    <div id="viewAllScreen" class="screen">
+      <header>
+        <button class="back-btn" onclick="showScreen('menuScreen')">← Back</button>
+        <h1>All Paints</h1>
+        <div style="width: 44px;"></div>
+      </header>
+      <main class="view-all-container">
+        <div class="sort-controls">
+          <select id="sortBy" onchange="resortAllPaints()">
+            <option value="building">Sort by Building</option>
+            <option value="color">Sort by Color</option>
+            <option value="line">Sort by Paint Line</option>
+          </select>
+        </div>
+        <div id="allPaintsContainer" class="results-container">
+          <p class="placeholder">Loading paints...</p>
+        </div>
+      </main>
+    </div>
+
+    <!-- Admin Panel Screen -->
+    <div id="adminScreen" class="screen">
+      <header>
+        <button class="back-btn" onclick="showScreen('menuScreen')">← Back</button>
+        <h1>Admin Panel</h1>
+        <div style="width: 44px;"></div>
+      </header>
+      <main class="admin-container">
+        <div class="admin-tabs">
+          <button class="admin-tab-btn active" onclick="switchAdminTab('buildings')">Buildings</button>
+          <button class="admin-tab-btn" onclick="switchAdminTab('paintlines')">Paint Lines</button>
+          <button class="admin-tab-btn" onclick="switchAdminTab('sheens')">Sheens</button>
+          <button class="admin-tab-btn" onclick="switchAdminTab('export')">Export</button>
+          <button class="admin-tab-btn" onclick="switchAdminTab('backups')">Backups</button>
+        </div>
+
+        <!-- Buildings Tab -->
+        <div id="buildingsTab" class="admin-tab-content active">
+          <div class="admin-section">
+            <h3>Add New Building</h3>
+            <form onsubmit="addNewBuilding(event)">
+              <input type="text" id="newBuilding" placeholder="Enter building name" required>
+              <button type="submit" class="admin-btn">Add Building</button>
+            </form>
+            <div id="buildingsList" class="items-list"></div>
+          </div>
+        </div>
+
+        <!-- Paint Lines Tab -->
+        <div id="paintlinesTab" class="admin-tab-content">
+          <div class="admin-section">
+            <h3>Add New Paint Line</h3>
+            <form onsubmit="addNewPaintLine(event)">
+              <input type="text" id="newPaintLine" placeholder="Enter paint line name" required>
+              <button type="submit" class="admin-btn">Add Paint Line</button>
+            </form>
+            <div id="paintlinesList" class="items-list"></div>
+          </div>
+        </div>
+
+        <!-- Sheens Tab -->
+        <div id="sheensTab" class="admin-tab-content">
+          <div class="admin-section">
+            <h3>Add New Sheen/Finish</h3>
+            <form onsubmit="addNewSheen(event)">
+              <input type="text" id="newSheen" placeholder="Enter sheen/finish name" required>
+              <button type="submit" class="admin-btn">Add Sheen</button>
+            </form>
+            <div id="sheensList" class="items-list"></div>
+          </div>
+        </div>
+
+        <!-- Export Tab -->
+        <div id="exportTab" class="admin-tab-content">
+          <div class="admin-section">
+            <h3>Database Management</h3>
+            <p id="dbStats" class="db-stats"></p>
+            <div class="button-group">
+              <button class="admin-btn export-btn" onclick="exportDatabaseJSON()">
+                📥 Export as JSON
+              </button>
+              <button class="admin-btn export-btn" onclick="exportDatabaseCSV()">
+                📥 Export as CSV
+              </button>
+            </div>
+            <p class="admin-info">Your data is automatically backed up in these formats. Download regularly for safety.</p>
+          </div>
+        </div>
+
+        <!-- Backups Tab -->
+        <div id="backupsTab" class="admin-tab-content">
+          <div class="admin-section">
+            <h3>Automatic Backups</h3>
+            <p class="admin-info">Backups are created automatically every 6 months. You can also create a manual backup anytime.</p>
+            <button class="admin-btn" onclick="createManualBackup()">
+              💾 Create Backup Now
+            </button>
+            <h4 style="margin-top: 1.5rem; margin-bottom: 1rem;">Previous Backups</h4>
+            <div id="backupsList" class="backups-list"></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
