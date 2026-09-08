@@ -1,5 +1,5 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 const path = require('path');
 const bodyParser = require('body-parser');
 const cron = require('node-cron');
@@ -7,13 +7,27 @@ const fs = require('fs');
 const simpleGit = require('simple-git');
 
 const app = express();
-const PORT = 3000;
-const PASSPHRASE = process.env.PAINT_PASSPHRASE || 'paintapp123'; // Change this to your passphrase
+const PORT = process.env.PORT || 3000;
+const PASSPHRASE = process.env.PAINT_PASSPHRASE || 'paintapp123';
 
 // GitHub backup configuration
-const GITHUB_REPO = process.env.GITHUB_REPO; // e.g., YOUR-USERNAME/paint-app
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN; // Personal access token
-const PUSH_BACKUPS_TO_GITHUB = GITHUB_REPO && GITHUB_TOKEN; // Only if both are set
+const GITHUB_REPO = process.env.GITHUB_REPO;
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const PUSH_BACKUPS_TO_GITHUB = GITHUB_REPO && GITHUB_TOKEN;
+
+// PostgreSQL connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+});
+
+pool.on('connect', () => {
+  console.log('Connected to PostgreSQL database');
+});
 
 // Backup configuration
 const backupsDir = path.join(__dirname, 'backups');
@@ -21,36 +35,36 @@ if (!fs.existsSync(backupsDir)) {
   fs.mkdirSync(backupsDir);
 }
 
-// Database setup
-const dbPath = path.join(__dirname, 'paints.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) console.error('Database connection error:', err);
-  else console.log('Connected to SQLite database');
-});
-
 // Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Initialize database tables
-db.serialize(() => {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS paints (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      building TEXT NOT NULL,
-      paint_color TEXT NOT NULL,
-      finish TEXT NOT NULL,
-      paint_line TEXT NOT NULL,
-      location_in_building TEXT,
-      custom_color BOOLEAN DEFAULT 0,
-      order_number TEXT,
-      notes TEXT,
-      paint_name TEXT
-    )
-  `);
-});
+async function initializeDatabase() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS paints (
+        id SERIAL PRIMARY KEY,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        building TEXT NOT NULL,
+        paint_color TEXT NOT NULL,
+        finish TEXT NOT NULL,
+        paint_line TEXT NOT NULL,
+        location_in_building TEXT,
+        custom_color BOOLEAN DEFAULT FALSE,
+        order_number TEXT,
+        notes TEXT,
+        paint_name TEXT
+      )
+    `);
+    console.log('✓ Database tables initialized');
+  } catch (err) {
+    console.error('Database initialization error:', err);
+  }
+}
+
+initializeDatabase();
 
 // API Routes
 
@@ -65,43 +79,41 @@ app.post('/api/verify-passphrase', (req, res) => {
 });
 
 // Get all paints
-app.get('/api/paints', (req, res) => {
-  db.all('SELECT * FROM paints ORDER BY building, paint_color', (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-    } else {
-      res.json(rows);
-    }
-  });
+app.get('/api/paints', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM paints ORDER BY building, paint_color');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Search paints
-app.get('/api/search', (req, res) => {
+app.get('/api/search', async (req, res) => {
   const { query, type } = req.query;
   let sql = 'SELECT * FROM paints WHERE 1=1';
   const params = [];
 
   if (type === 'color' && query) {
-    sql += ' AND (paint_color LIKE ? OR paint_name LIKE ?)';
-    params.push(`%${query}%`, `%${query}%`);
+    sql += ' AND (paint_color ILIKE $1 OR paint_name ILIKE $1)';
+    params.push(`%${query}%`);
   } else if (type === 'building' && query) {
-    sql += ' AND building LIKE ?';
+    sql += ' AND building ILIKE $1';
     params.push(`%${query}%`);
   }
 
   sql += ' ORDER BY building, paint_color';
 
-  db.all(sql, params, (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-    } else {
-      res.json(rows);
-    }
-  });
+  try {
+    const result = await pool.query(sql, params);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Add new paint
-app.post('/api/paints', (req, res) => {
+app.post('/api/paints', async (req, res) => {
   const {
     building,
     paint_color,
@@ -113,37 +125,34 @@ app.post('/api/paints', (req, res) => {
     notes
   } = req.body;
 
-  const stmt = db.prepare(`
-    INSERT INTO paints (
-      building, paint_color, finish, paint_line, location_in_building,
-      custom_color, order_number, notes, paint_name
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  try {
+    const result = await pool.query(
+      `INSERT INTO paints (
+        building, paint_color, finish, paint_line, location_in_building,
+        custom_color, order_number, notes, paint_name
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING id`,
+      [
+        building,
+        paint_color,
+        finish,
+        paint_line,
+        location_in_building,
+        custom_color || false,
+        order_number || null,
+        notes || null,
+        paint_color.toUpperCase()
+      ]
+    );
 
-  stmt.run(
-    building,
-    paint_color,
-    finish,
-    paint_line,
-    location_in_building,
-    custom_color ? 1 : 0,
-    order_number || null,
-    notes || null,
-    paint_color.toUpperCase(),
-    function(err) {
-      if (err) {
-        res.status(500).json({ error: err.message });
-      } else {
-        res.json({ success: true, id: this.lastID });
-      }
-    }
-  );
-
-  stmt.finalize();
+    res.json({ success: true, id: result.rows[0].id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Get distinct values for dropdowns
-app.get('/api/options/:field', (req, res) => {
+app.get('/api/options/:field', async (req, res) => {
   const field = req.params.field;
   const allowedFields = ['building', 'paint_line', 'finish'];
 
@@ -151,51 +160,133 @@ app.get('/api/options/:field', (req, res) => {
     return res.status(400).json({ error: 'Invalid field' });
   }
 
-  db.all(`SELECT DISTINCT ${field} FROM paints WHERE ${field} IS NOT NULL ORDER BY ${field}`, (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-    } else {
-      const options = rows.map(r => r[field]).filter(Boolean);
-      res.json(options);
-    }
-  });
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT ${field} FROM paints WHERE ${field} IS NOT NULL ORDER BY ${field}`
+    );
+    const options = result.rows.map(r => r[field]).filter(Boolean);
+    res.json(options);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
+
+// Backup Management
+
+async function createBackup() {
+  try {
+    const result = await pool.query('SELECT * FROM paints ORDER BY building, paint_color');
+    const rows = result.rows;
+
+    const timestamp = new Date().toISOString().split('T')[0];
+    const backupFileName = `paint-backup-${timestamp}.json`;
+    const backupPath = path.join(backupsDir, backupFileName);
+
+    const backupData = {
+      created: new Date().toISOString(),
+      totalEntries: rows.length,
+      data: rows
+    };
+
+    return new Promise((resolve, reject) => {
+      fs.writeFile(backupPath, JSON.stringify(backupData, null, 2), async (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          console.log(`✓ Backup created: ${backupFileName}`);
+
+          // Try to push to GitHub (non-blocking)
+          if (PUSH_BACKUPS_TO_GITHUB) {
+            pushBackupToGithub(backupPath, backupFileName).catch(err => {
+              console.error('Failed to push backup to GitHub:', err.message);
+            });
+          }
+
+          resolve(backupPath);
+        }
+      });
+    });
+  } catch (err) {
+    throw err;
+  }
+}
+
+async function pushBackupToGithub(backupPath, backupFileName) {
+  if (!PUSH_BACKUPS_TO_GITHUB) {
+    return;
+  }
+
+  try {
+    const git = simpleGit();
+    const remoteUrl = `https://${GITHUB_TOKEN}@github.com/${GITHUB_REPO}.git`;
+
+    await git.add(backupPath);
+    await git.commit(`Auto-backup: ${backupFileName}`, ['--no-verify']);
+    await git.push([remoteUrl, 'main'], ['--quiet']);
+
+    console.log(`✓ Backup pushed to GitHub: ${backupFileName}`);
+  } catch (err) {
+    console.error('GitHub push error:', err.message);
+  }
+}
+
+function getLastBackupDate() {
+  try {
+    const files = fs.readdirSync(backupsDir);
+    if (files.length === 0) return null;
+
+    const sorted = files.sort().reverse();
+    return sorted[0];
+  } catch (err) {
+    return null;
+  }
+}
+
+function needsBackup() {
+  const lastBackupFile = getLastBackupDate();
+  if (!lastBackupFile) return true;
+
+  const dateMatch = lastBackupFile.match(/backup-(\d{4}-\d{2}-\d{2})/);
+  if (!dateMatch) return true;
+
+  const lastBackupDate = new Date(dateMatch[1]);
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+  return lastBackupDate < sixMonthsAgo;
+}
 
 // Admin endpoints
 
 // Get database stats
-app.get('/api/admin/stats', (req, res) => {
-  db.get('SELECT COUNT(*) as total FROM paints', (err, row) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-    } else {
-      res.json({
-        totalPaints: row.total
-      });
-    }
-  });
+app.get('/api/admin/stats', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT COUNT(*) as total FROM paints');
+    res.json({
+      totalPaints: parseInt(result.rows[0].total)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Download database as JSON
-app.get('/api/admin/export', (req, res) => {
-  db.all('SELECT * FROM paints ORDER BY building, paint_color', (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-    } else {
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename="paint-database-${new Date().toISOString().split('T')[0]}.json"`);
-      res.json(rows);
-    }
-  });
+app.get('/api/admin/export', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM paints ORDER BY building, paint_color');
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="paint-database-${new Date().toISOString().split('T')[0]}.json"`);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Download database as CSV
-app.get('/api/admin/export-csv', (req, res) => {
-  db.all('SELECT * FROM paints ORDER BY building, paint_color', (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
+app.get('/api/admin/export-csv', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM paints ORDER BY building, paint_color');
+    const rows = result.rows;
 
     if (rows.length === 0) {
       res.status(400).json({ error: 'No data to export' });
@@ -220,101 +311,10 @@ app.get('/api/admin/export-csv', (req, res) => {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="paint-database-${new Date().toISOString().split('T')[0]}.csv"`);
     res.send(csv);
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
-
-// Backup Management
-
-async function pushBackupToGithub(backupPath, backupFileName) {
-  if (!PUSH_BACKUPS_TO_GITHUB) {
-    return; // GitHub not configured
-  }
-
-  try {
-    const git = simpleGit();
-    const remoteUrl = `https://${GITHUB_TOKEN}@github.com/${GITHUB_REPO}.git`;
-
-    // Add the backup file
-    await git.add(backupPath);
-
-    // Commit
-    await git.commit(`Auto-backup: ${backupFileName}`, ['--no-verify']);
-
-    // Push (with token in URL for authentication)
-    await git.push([remoteUrl, 'main'], ['--quiet']);
-
-    console.log(`✓ Backup pushed to GitHub: ${backupFileName}`);
-  } catch (err) {
-    console.error('GitHub push error:', err.message);
-    // Don't reject - local backup still exists
-  }
-}
-
-function createBackup() {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM paints ORDER BY building, paint_color', (err, rows) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      const timestamp = new Date().toISOString().split('T')[0];
-      const backupFileName = `paint-backup-${timestamp}.json`;
-      const backupPath = path.join(backupsDir, backupFileName);
-
-      const backupData = {
-        created: new Date().toISOString(),
-        totalEntries: rows.length,
-        data: rows
-      };
-
-      fs.writeFile(backupPath, JSON.stringify(backupData, null, 2), (err) => {
-        if (err) {
-          reject(err);
-        } else {
-          console.log(`✓ Backup created: ${backupFileName}`);
-
-          // Try to push to GitHub (non-blocking)
-          if (PUSH_BACKUPS_TO_GITHUB) {
-            pushBackupToGithub(backupPath, backupFileName).catch(err => {
-              console.error('Failed to push backup to GitHub:', err.message);
-            });
-          }
-
-          resolve(backupPath);
-        }
-      });
-    });
-  });
-}
-
-function getLastBackupDate() {
-  try {
-    const files = fs.readdirSync(backupsDir);
-    if (files.length === 0) return null;
-
-    const sorted = files.sort().reverse();
-    return sorted[0]; // Most recent backup filename
-  } catch (err) {
-    return null;
-  }
-}
-
-function needsBackup() {
-  const lastBackupFile = getLastBackupDate();
-  if (!lastBackupFile) return true; // No backup exists
-
-  const dateMatch = lastBackupFile.match(/backup-(\d{4}-\d{2}-\d{2})/);
-  if (!dateMatch) return true;
-
-  const lastBackupDate = new Date(dateMatch[1]);
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-  return lastBackupDate < sixMonthsAgo;
-}
-
-// API endpoints for backup management
 
 // List all backups
 app.get('/api/admin/backups', (req, res) => {
@@ -347,14 +347,12 @@ app.get('/api/admin/backups', (req, res) => {
 app.get('/api/admin/backup/:filename', (req, res) => {
   const filename = req.params.filename;
 
-  // Security: prevent directory traversal
   if (filename.includes('..') || filename.includes('/')) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
 
   const filepath = path.join(backupsDir, filename);
 
-  // Check file exists and is in backups directory
   if (!fs.existsSync(filepath) || !filepath.startsWith(backupsDir)) {
     return res.status(404).json({ error: 'Backup not found' });
   }
@@ -363,18 +361,16 @@ app.get('/api/admin/backup/:filename', (req, res) => {
 });
 
 // Create manual backup
-app.post('/api/admin/backup-now', (req, res) => {
-  createBackup()
-    .then(backupPath => {
-      res.json({ success: true, message: 'Backup created successfully' });
-    })
-    .catch(err => {
-      res.status(500).json({ error: err.message });
-    });
+app.post('/api/admin/backup-now', async (req, res) => {
+  try {
+    await createBackup();
+    res.json({ success: true, message: 'Backup created successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Schedule automatic backups every 6 months
-// Check daily if a backup is needed
 cron.schedule('0 2 * * *', () => {
   console.log('Checking if backup is needed...');
   if (needsBackup()) {
