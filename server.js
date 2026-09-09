@@ -66,6 +66,17 @@ async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE
     `);
 
+    // Create disabled_values table for managing dropdown options
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS disabled_values (
+        id SERIAL PRIMARY KEY,
+        value_type TEXT NOT NULL,
+        value TEXT NOT NULL,
+        disabled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(value_type, value)
+      )
+    `);
+
     console.log('✓ Database tables initialized');
   } catch (err) {
     console.error('Database initialization error:', err);
@@ -161,7 +172,7 @@ app.post('/api/paints', async (req, res) => {
   }
 });
 
-// Get distinct values for dropdowns
+// Get distinct values for dropdowns (excluding disabled)
 app.get('/api/options/:field', async (req, res) => {
   const field = req.params.field;
   const allowedFields = ['building', 'paint_line', 'finish'];
@@ -171,11 +182,98 @@ app.get('/api/options/:field', async (req, res) => {
   }
 
   try {
+    // Get disabled values for this field
+    const disabledResult = await pool.query(
+      `SELECT value FROM disabled_values WHERE value_type = $1`,
+      [field]
+    );
+    const disabledValues = disabledResult.rows.map(r => r.value);
+
+    // Get all distinct values
     const result = await pool.query(
       `SELECT DISTINCT ${field} FROM paints WHERE ${field} IS NOT NULL ORDER BY ${field}`
     );
-    const options = result.rows.map(r => r[field]).filter(Boolean);
+    const options = result.rows
+      .map(r => r[field])
+      .filter(Boolean)
+      .filter(val => !disabledValues.includes(val));
+
     res.json(options);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get all values (including disabled) for admin
+app.get('/api/options-admin/:field', async (req, res) => {
+  const field = req.params.field;
+  const allowedFields = ['paint_line', 'finish'];
+
+  if (!allowedFields.includes(field)) {
+    return res.status(400).json({ error: 'Invalid field' });
+  }
+
+  try {
+    // Get all distinct values
+    const result = await pool.query(
+      `SELECT DISTINCT ${field} FROM paints WHERE ${field} IS NOT NULL ORDER BY ${field}`
+    );
+
+    // Get disabled status
+    const disabledResult = await pool.query(
+      `SELECT value FROM disabled_values WHERE value_type = $1`,
+      [field]
+    );
+    const disabledSet = new Set(disabledResult.rows.map(r => r.value));
+
+    const options = result.rows.map(r => ({
+      value: r[field],
+      disabled: disabledSet.has(r[field])
+    }));
+
+    res.json(options);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Disable/enable paint line or sheen
+app.post('/api/options/:field/disable', async (req, res) => {
+  const { field } = req.params;
+  const { value } = req.body;
+  const allowedFields = ['paint_line', 'finish'];
+
+  if (!allowedFields.includes(field)) {
+    return res.status(400).json({ error: 'Invalid field' });
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO disabled_values (value_type, value) VALUES ($1, $2)
+       ON CONFLICT (value_type, value) DO NOTHING`,
+      [field, value]
+    );
+    res.json({ success: true, message: `${value} disabled` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/options/:field/enable', async (req, res) => {
+  const { field } = req.params;
+  const { value } = req.body;
+  const allowedFields = ['paint_line', 'finish'];
+
+  if (!allowedFields.includes(field)) {
+    return res.status(400).json({ error: 'Invalid field' });
+  }
+
+  try {
+    await pool.query(
+      `DELETE FROM disabled_values WHERE value_type = $1 AND value = $2`,
+      [field, value]
+    );
+    res.json({ success: true, message: `${value} enabled` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

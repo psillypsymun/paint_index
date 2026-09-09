@@ -482,7 +482,7 @@ function addNewBuilding(event) {
 
 // Paint Lines Management
 function loadPaintLinesList() {
-  fetch('/api/options/paint_line')
+  fetch('/api/options-admin/paint_line')
     .then(res => res.json())
     .then(lines => {
       const container = document.getElementById('paintlinesList');
@@ -491,7 +491,13 @@ function loadPaintLinesList() {
         return;
       }
       container.innerHTML = lines.map(l =>
-        `<div class="item-badge">${escapeHtml(l)}</div>`
+        `<div class="item-badge" style="opacity: ${l.disabled ? '0.5' : '1'}">
+          ${escapeHtml(l.value)}
+          ${l.disabled ? ' (disabled)' : ''}
+          <button class="delete-value-btn" onclick="togglePaintLineStatus('${escapeHtml(l.value)}', ${l.disabled})">
+            ${l.disabled ? '↺ Restore' : '✕'}
+          </button>
+        </div>`
       ).join('');
     });
 }
@@ -534,9 +540,38 @@ function addNewPaintLine(event) {
     });
 }
 
+function togglePaintLineStatus(lineName, isDisabled) {
+  const action = isDisabled ? 'restore' : 'disable';
+  const confirmMsg = isDisabled
+    ? `Restore "${lineName}" to the dropdown?`
+    : `Disable "${lineName}"? It will be hidden from the dropdown.`;
+
+  if (!confirm(confirmMsg)) {
+    return;
+  }
+
+  const endpoint = isDisabled ? 'enable' : 'disable';
+
+  fetch(`/api/options/paint_line/${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: lineName })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        loadPaintLinesList();
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Error updating paint line');
+    });
+}
+
 // Sheens Management
 function loadSheensList() {
-  fetch('/api/options/finish')
+  fetch('/api/options-admin/finish')
     .then(res => res.json())
     .then(sheens => {
       const container = document.getElementById('sheensList');
@@ -545,7 +580,13 @@ function loadSheensList() {
         return;
       }
       container.innerHTML = sheens.map(s =>
-        `<div class="item-badge">${escapeHtml(s)}</div>`
+        `<div class="item-badge" style="opacity: ${s.disabled ? '0.5' : '1'}">
+          ${escapeHtml(s.value)}
+          ${s.disabled ? ' (disabled)' : ''}
+          <button class="delete-value-btn" onclick="toggleSheenStatus('${escapeHtml(s.value)}', ${s.disabled})">
+            ${s.disabled ? '↺ Restore' : '✕'}
+          </button>
+        </div>`
       ).join('');
     });
 }
@@ -585,6 +626,34 @@ function addNewSheen(event) {
     .catch(error => {
       console.error('Error:', error);
       alert('Error adding sheen');
+    });
+}
+
+function toggleSheenStatus(sheenName, isDisabled) {
+  const confirmMsg = isDisabled
+    ? `Restore "${sheenName}" to the dropdown?`
+    : `Disable "${sheenName}"? It will be hidden from the dropdown.`;
+
+  if (!confirm(confirmMsg)) {
+    return;
+  }
+
+  const endpoint = isDisabled ? 'enable' : 'disable';
+
+  fetch(`/api/options/finish/${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: sheenName })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        loadSheensList();
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Error updating sheen');
     });
 }
 
