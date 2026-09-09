@@ -156,17 +156,22 @@ function submitPaint(event) {
         // Show success message
         const successDiv = document.getElementById('entrySuccess');
         successDiv.style.display = 'block';
-        successDiv.textContent = '✓ Paint entry added successfully!';
+        successDiv.textContent = '✓ Paint entry added! Ready for the next one.';
 
         // Reset form
         document.getElementById('paintForm').reset();
         document.getElementById('orderNumberGroup').style.display = 'none';
 
-        // Auto-return to menu after 2 seconds
+        // Clear paint name suggestions
+        document.getElementById('paintNameSuggestions').innerHTML = '';
+
+        // Hide success message after 2 seconds
         setTimeout(() => {
           successDiv.style.display = 'none';
-          showScreen('menuScreen');
         }, 2000);
+
+        // Scroll to top of form
+        document.querySelector('.form-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     })
     .catch(error => {
