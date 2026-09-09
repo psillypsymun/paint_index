@@ -266,6 +266,11 @@ function searchPaints(type) {
               <span class="value">${escapeHtml(paint.notes)}</span>
             </div>
           ` : ''}
+          <div class="archive-btn-container">
+            <button class="archive-btn" onclick="archivePaint(${paint.id}, '${escapeHtml(paint.paint_color)}')">
+              🗑️ Archive
+            </button>
+          </div>
         </div>
       `).join('');
     })
@@ -406,6 +411,8 @@ function switchAdminTab(tab) {
     loadPaintLinesList();
   } else if (tab === 'sheens') {
     loadSheensList();
+  } else if (tab === 'archived') {
+    loadArchivedPaints();
   } else if (tab === 'export') {
     loadDatabaseStats();
   } else if (tab === 'backups') {
@@ -651,6 +658,102 @@ function createManualBackup() {
     .catch(error => {
       console.error('Error:', error);
       alert('Error creating backup');
+    });
+}
+
+// Archive/Unarchive functions
+
+function archivePaint(id, paintName) {
+  if (!confirm(`Archive "${paintName}"? It will be hidden from search but can be restored from the Admin Panel.`)) {
+    return;
+  }
+
+  fetch(`/api/paints/${id}/archive`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        alert(`✓ "${paintName}" archived successfully`);
+        // Reload search results
+        const activeTab = document.querySelector('.tab-btn.active').onclick.toString();
+        if (activeTab.includes('building')) {
+          searchPaints('building');
+        } else {
+          searchPaints('color');
+        }
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Error archiving paint');
+    });
+}
+
+function loadArchivedPaints() {
+  fetch('/api/paints/archived')
+    .then(res => res.json())
+    .then(archived => {
+      const container = document.getElementById('archivedList');
+
+      if (archived.length === 0) {
+        container.innerHTML = '<p class="placeholder">No archived paints</p>';
+        return;
+      }
+
+      container.innerHTML = archived.map(paint => `
+        <div class="paint-result">
+          <h3>${escapeHtml(paint.paint_color)}</h3>
+          <div class="detail">
+            <span class="label">Building:</span>
+            <span class="value">${escapeHtml(paint.building)}</span>
+          </div>
+          <div class="detail">
+            <span class="label">Paint Line:</span>
+            <span class="value">${escapeHtml(paint.paint_line)}</span>
+          </div>
+          <div class="detail">
+            <span class="label">Finish:</span>
+            <span class="value">${escapeHtml(paint.finish)}</span>
+          </div>
+          <div class="detail">
+            <span class="label">Location:</span>
+            <span class="value">${escapeHtml(paint.location_in_building || 'N/A')}</span>
+          </div>
+          <div class="archive-btn-container">
+            <button class="archive-btn restore-btn" onclick="restorePaint(${paint.id}, '${escapeHtml(paint.paint_color)}')">
+              ↺ Restore
+            </button>
+          </div>
+        </div>
+      `).join('');
+    })
+    .catch(error => {
+      console.error('Error loading archived paints:', error);
+      document.getElementById('archivedList').innerHTML = '<p class="placeholder">Error loading archived paints</p>';
+    });
+}
+
+function restorePaint(id, paintName) {
+  if (!confirm(`Restore "${paintName}"? It will appear in search results again.`)) {
+    return;
+  }
+
+  fetch(`/api/paints/${id}/unarchive`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        alert(`✓ "${paintName}" restored successfully`);
+        loadArchivedPaints();
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Error restoring paint');
     });
 }
 

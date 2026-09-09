@@ -55,9 +55,17 @@ async function initializeDatabase() {
         custom_color BOOLEAN DEFAULT FALSE,
         order_number TEXT,
         notes TEXT,
-        paint_name TEXT
+        paint_name TEXT,
+        archived BOOLEAN DEFAULT FALSE
       )
     `);
+
+    // Add archived column if it doesn't exist (for existing databases)
+    await pool.query(`
+      ALTER TABLE paints
+      ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE
+    `);
+
     console.log('✓ Database tables initialized');
   } catch (err) {
     console.error('Database initialization error:', err);
@@ -78,10 +86,12 @@ app.post('/api/verify-passphrase', (req, res) => {
   }
 });
 
-// Get all paints
+// Get all paints (excluding archived)
 app.get('/api/paints', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM paints ORDER BY building, paint_color');
+    const result = await pool.query(
+      'SELECT * FROM paints WHERE archived = FALSE ORDER BY building, paint_color'
+    );
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -91,7 +101,7 @@ app.get('/api/paints', async (req, res) => {
 // Search paints
 app.get('/api/search', async (req, res) => {
   const { query, type } = req.query;
-  let sql = 'SELECT * FROM paints WHERE 1=1';
+  let sql = 'SELECT * FROM paints WHERE archived = FALSE';
   const params = [];
 
   if (type === 'color' && query) {
@@ -166,6 +176,39 @@ app.get('/api/options/:field', async (req, res) => {
     );
     const options = result.rows.map(r => r[field]).filter(Boolean);
     res.json(options);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Archive/Unarchive paint
+app.post('/api/paints/:id/archive', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('UPDATE paints SET archived = TRUE WHERE id = $1', [id]);
+    res.json({ success: true, message: 'Paint archived' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/paints/:id/unarchive', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('UPDATE paints SET archived = FALSE WHERE id = $1', [id]);
+    res.json({ success: true, message: 'Paint restored' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get archived paints
+app.get('/api/paints/archived', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM paints WHERE archived = TRUE ORDER BY building, paint_color'
+    );
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

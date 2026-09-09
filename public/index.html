@@ -206,6 +206,7 @@
           <button class="admin-tab-btn active" onclick="switchAdminTab('buildings')">Buildings</button>
           <button class="admin-tab-btn" onclick="switchAdminTab('paintlines')">Paint Lines</button>
           <button class="admin-tab-btn" onclick="switchAdminTab('sheens')">Sheens</button>
+          <button class="admin-tab-btn" onclick="switchAdminTab('archived')">Archived</button>
           <button class="admin-tab-btn" onclick="switchAdminTab('export')">Export</button>
           <button class="admin-tab-btn" onclick="switchAdminTab('backups')">Backups</button>
         </div>
@@ -243,6 +244,17 @@
               <button type="submit" class="admin-btn">Add Sheen</button>
             </form>
             <div id="sheensList" class="items-list"></div>
+          </div>
+        </div>
+
+        <!-- Archived Tab -->
+        <div id="archivedTab" class="admin-tab-content">
+          <div class="admin-section">
+            <h3>Archived Paints</h3>
+            <p class="admin-info">Archived paints are hidden from search and view, but can be restored anytime.</p>
+            <div id="archivedList" class="results-container">
+              <p class="placeholder">No archived paints</p>
+            </div>
           </div>
         </div>
 
