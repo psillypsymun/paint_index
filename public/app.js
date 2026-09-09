@@ -267,8 +267,8 @@ function searchPaints(type) {
             </div>
           ` : ''}
           <div class="archive-btn-container">
-            <button class="archive-btn" onclick="archivePaint(${paint.id}, '${escapeHtml(paint.paint_color)}')">
-              🗑️ Archive
+            <button class="archive-btn" onclick="archivePaint(${paint.id}, '${escapeHtml(paint.paint_color)}')" title="Archive this paint">
+              🗑️
             </button>
           </div>
         </div>
@@ -664,30 +664,55 @@ function createManualBackup() {
 // Archive/Unarchive functions
 
 function archivePaint(id, paintName) {
-  if (!confirm(`Archive "${paintName}"? It will be hidden from search but can be restored from the Admin Panel.`)) {
+  const passphrase = prompt(`Archive "${paintName}"?\n\nEnter your passphrase to confirm:`);
+
+  if (passphrase === null) {
+    return; // User cancelled
+  }
+
+  if (passphrase === '') {
+    alert('Passphrase is required');
     return;
   }
 
-  fetch(`/api/paints/${id}/archive`, {
+  // Verify passphrase
+  fetch('/api/verify-passphrase', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ passphrase })
   })
     .then(res => res.json())
     .then(data => {
       if (data.success) {
-        alert(`✓ "${paintName}" archived successfully`);
-        // Reload search results
-        const activeTab = document.querySelector('.tab-btn.active').onclick.toString();
-        if (activeTab.includes('building')) {
-          searchPaints('building');
-        } else {
-          searchPaints('color');
-        }
+        // Passphrase correct, proceed with archive
+        fetch(`/api/paints/${id}/archive`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        })
+          .then(res => res.json())
+          .then(result => {
+            if (result.success) {
+              alert(`✓ "${paintName}" archived successfully`);
+              // Reload search results
+              const activeTab = document.querySelector('.tab-btn.active');
+              if (activeTab && activeTab.textContent.includes('Building')) {
+                searchPaints('building');
+              } else {
+                searchPaints('color');
+              }
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('Error archiving paint');
+          });
+      } else {
+        alert('Incorrect passphrase. Archive cancelled.');
       }
     })
     .catch(error => {
-      console.error('Error:', error);
-      alert('Error archiving paint');
+      console.error('Error verifying passphrase:', error);
+      alert('Error verifying passphrase');
     });
 }
 
