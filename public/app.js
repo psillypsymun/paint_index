@@ -74,10 +74,12 @@ function loadDropdownOptions() {
   Promise.all([
     fetch('/api/options/building').then(r => r.json()),
     fetch('/api/options/paint_line').then(r => r.json()),
-    fetch('/api/options/finish').then(r => r.json())
+    fetch('/api/options/finish').then(r => r.json()),
+    fetch('/api/paints').then(r => r.json())
   ])
-    .then(([buildings, paintLines, sheens]) => {
+    .then(([buildings, paintLines, sheens, allPaints]) => {
       appState.dropdownOptions = { buildings, paintLines, sheens };
+      appState.allPaints = allPaints;
       populateDropdowns();
     })
     .catch(error => console.error('Error loading options:', error));
@@ -179,11 +181,30 @@ function loadAllPaints() {
     .then(res => res.json())
     .then(paints => {
       appState.allPaints = paints;
-      document.getElementById('resultsContainer').innerHTML = '<p class="placeholder">Start typing to search...</p>';
+      document.getElementById('resultsContainer').innerHTML = '<p class="placeholder">Select a building to view paints...</p>';
       document.getElementById('colorSearch').value = '';
       document.getElementById('buildingSearch').value = '';
+
+      // Populate buildings dropdown
+      populateBuildingsDropdown();
     })
     .catch(error => console.error('Error loading paints:', error));
+}
+
+// Populate buildings dropdown in search
+function populateBuildingsDropdown() {
+  fetch('/api/options/building')
+    .then(res => res.json())
+    .then(buildings => {
+      const select = document.getElementById('buildingSearch');
+      select.innerHTML = '<option value="">Select a building...</option>';
+      buildings.forEach(building => {
+        const option = document.createElement('option');
+        option.value = building;
+        option.textContent = building;
+        select.appendChild(option);
+      });
+    });
 }
 
 // Search paints
@@ -193,7 +214,10 @@ function searchPaints(type) {
     : document.getElementById('buildingSearch').value.trim();
 
   if (!query) {
-    document.getElementById('resultsContainer').innerHTML = '<p class="placeholder">Start typing to search...</p>';
+    const placeholder = type === 'building'
+      ? 'Select a building to view paints...'
+      : 'Start typing to search...';
+    document.getElementById('resultsContainer').innerHTML = `<p class="placeholder">${placeholder}</p>`;
     return;
   }
 
@@ -628,6 +652,27 @@ function createManualBackup() {
       console.error('Error:', error);
       alert('Error creating backup');
     });
+}
+
+// Paint name autocomplete
+function updatePaintSuggestions() {
+  const input = document.getElementById('paintName').value.trim().toLowerCase();
+  const datalist = document.getElementById('paintNameSuggestions');
+
+  if (input.length === 0) {
+    datalist.innerHTML = '';
+    return;
+  }
+
+  // Get unique paint colors from existing paints
+  const uniqueColors = [...new Set(appState.allPaints
+    .map(p => p.paint_color)
+    .filter(c => c.toLowerCase().includes(input))
+  )].sort().slice(0, 10); // Limit to 10 suggestions
+
+  datalist.innerHTML = uniqueColors
+    .map(color => `<option value="${escapeHtml(color)}"></option>`)
+    .join('');
 }
 
 // Utility function to escape HTML
