@@ -427,7 +427,7 @@ function switchAdminTab(tab) {
 
 // Buildings Management
 function loadBuildingsList() {
-  fetch('/api/options/building')
+  fetch('/api/options-admin/building')
     .then(res => res.json())
     .then(buildings => {
       const container = document.getElementById('buildingsList');
@@ -436,7 +436,10 @@ function loadBuildingsList() {
         return;
       }
       container.innerHTML = buildings.map(b =>
-        `<div class="item-badge">${escapeHtml(b)}</div>`
+        `<div class="item-badge">
+          ${escapeHtml(b.value)}
+          <button class="delete-value-btn" onclick="deleteBuilding('${escapeHtml(b.value)}')">✕</button>
+        </div>`
       ).join('');
     });
 }
@@ -490,15 +493,14 @@ function loadPaintLinesList() {
         container.innerHTML = '<p class="placeholder">No paint lines yet.</p>';
         return;
       }
-      container.innerHTML = lines.map(l =>
-        `<div class="item-badge" style="opacity: ${l.disabled ? '0.5' : '1'}">
-          ${escapeHtml(l.value)}
-          ${l.disabled ? ' (disabled)' : ''}
-          <button class="delete-value-btn" onclick="togglePaintLineStatus('${escapeHtml(l.value)}', ${l.disabled})">
-            ${l.disabled ? '↺ Restore' : '✕'}
-          </button>
-        </div>`
-      ).join('');
+      container.innerHTML = lines
+        .filter(l => !l.disabled)
+        .map(l =>
+          `<div class="item-badge">
+            ${escapeHtml(l.value)}
+            <button class="delete-value-btn" onclick="deletePaintLine('${escapeHtml(l.value)}')">✕</button>
+          </div>`
+        ).join('');
     });
 }
 
@@ -540,19 +542,12 @@ function addNewPaintLine(event) {
     });
 }
 
-function togglePaintLineStatus(lineName, isDisabled) {
-  const action = isDisabled ? 'restore' : 'disable';
-  const confirmMsg = isDisabled
-    ? `Restore "${lineName}" to the dropdown?`
-    : `Disable "${lineName}"? It will be hidden from the dropdown.`;
-
-  if (!confirm(confirmMsg)) {
+function deletePaintLine(lineName) {
+  if (!confirm(`Delete "${lineName}" from paint lines? You can add it again anytime.`)) {
     return;
   }
 
-  const endpoint = isDisabled ? 'enable' : 'disable';
-
-  fetch(`/api/options/paint_line/${endpoint}`, {
+  fetch(`/api/options/paint_line/disable`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: lineName })
@@ -565,7 +560,7 @@ function togglePaintLineStatus(lineName, isDisabled) {
     })
     .catch(error => {
       console.error('Error:', error);
-      alert('Error updating paint line');
+      alert('Error deleting paint line');
     });
 }
 
@@ -579,15 +574,14 @@ function loadSheensList() {
         container.innerHTML = '<p class="placeholder">No sheens yet.</p>';
         return;
       }
-      container.innerHTML = sheens.map(s =>
-        `<div class="item-badge" style="opacity: ${s.disabled ? '0.5' : '1'}">
-          ${escapeHtml(s.value)}
-          ${s.disabled ? ' (disabled)' : ''}
-          <button class="delete-value-btn" onclick="toggleSheenStatus('${escapeHtml(s.value)}', ${s.disabled})">
-            ${s.disabled ? '↺ Restore' : '✕'}
-          </button>
-        </div>`
-      ).join('');
+      container.innerHTML = sheens
+        .filter(s => !s.disabled)
+        .map(s =>
+          `<div class="item-badge">
+            ${escapeHtml(s.value)}
+            <button class="delete-value-btn" onclick="deleteSheen('${escapeHtml(s.value)}')">✕</button>
+          </div>`
+        ).join('');
     });
 }
 
@@ -629,18 +623,12 @@ function addNewSheen(event) {
     });
 }
 
-function toggleSheenStatus(sheenName, isDisabled) {
-  const confirmMsg = isDisabled
-    ? `Restore "${sheenName}" to the dropdown?`
-    : `Disable "${sheenName}"? It will be hidden from the dropdown.`;
-
-  if (!confirm(confirmMsg)) {
+function deleteSheen(sheenName) {
+  if (!confirm(`Delete "${sheenName}" from sheens? You can add it again anytime.`)) {
     return;
   }
 
-  const endpoint = isDisabled ? 'enable' : 'disable';
-
-  fetch(`/api/options/finish/${endpoint}`, {
+  fetch(`/api/options/finish/disable`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: sheenName })
@@ -653,7 +641,29 @@ function toggleSheenStatus(sheenName, isDisabled) {
     })
     .catch(error => {
       console.error('Error:', error);
-      alert('Error updating sheen');
+      alert('Error deleting sheen');
+    });
+}
+
+function deleteBuilding(buildingName) {
+  if (!confirm(`Delete "${buildingName}" from buildings? You can add it again anytime.`)) {
+    return;
+  }
+
+  fetch(`/api/options/building/disable`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: buildingName })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        loadBuildingsList();
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Error deleting building');
     });
 }
 

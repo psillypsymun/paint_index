@@ -207,7 +207,7 @@ app.get('/api/options/:field', async (req, res) => {
 // Get all values (including disabled) for admin
 app.get('/api/options-admin/:field', async (req, res) => {
   const field = req.params.field;
-  const allowedFields = ['paint_line', 'finish'];
+  const allowedFields = ['building', 'paint_line', 'finish'];
 
   if (!allowedFields.includes(field)) {
     return res.status(400).json({ error: 'Invalid field' });
@@ -237,11 +237,11 @@ app.get('/api/options-admin/:field', async (req, res) => {
   }
 });
 
-// Disable/enable paint line or sheen
+// Disable paint line, sheen, or building
 app.post('/api/options/:field/disable', async (req, res) => {
   const { field } = req.params;
   const { value } = req.body;
-  const allowedFields = ['paint_line', 'finish'];
+  const allowedFields = ['building', 'paint_line', 'finish'];
 
   if (!allowedFields.includes(field)) {
     return res.status(400).json({ error: 'Invalid field' });
@@ -253,27 +253,7 @@ app.post('/api/options/:field/disable', async (req, res) => {
        ON CONFLICT (value_type, value) DO NOTHING`,
       [field, value]
     );
-    res.json({ success: true, message: `${value} disabled` });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/options/:field/enable', async (req, res) => {
-  const { field } = req.params;
-  const { value } = req.body;
-  const allowedFields = ['paint_line', 'finish'];
-
-  if (!allowedFields.includes(field)) {
-    return res.status(400).json({ error: 'Invalid field' });
-  }
-
-  try {
-    await pool.query(
-      `DELETE FROM disabled_values WHERE value_type = $1 AND value = $2`,
-      [field, value]
-    );
-    res.json({ success: true, message: `${value} enabled` });
+    res.json({ success: true, message: `${value} deleted` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
