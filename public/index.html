@@ -194,6 +194,78 @@
       </main>
     </div>
 
+    <!-- Edit Paint Screen -->
+    <div id="editScreen" class="screen">
+      <header>
+        <button class="back-btn" onclick="cancelEdit()">← Back</button>
+        <h1>Edit Paint</h1>
+        <div style="width: 44px;"></div>
+      </header>
+      <main class="form-container">
+        <form id="editPaintForm" onsubmit="submitEditPaint(event)">
+          <div class="form-group">
+            <label for="editBuilding">Building *</label>
+            <select id="editBuilding" required>
+              <option value="">Select a building</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="editPaintName">Paint Name/Color *</label>
+            <input type="text" id="editPaintName" placeholder="e.g., Agreeable Gray" required>
+          </div>
+
+          <div class="form-group">
+            <label>Is this a custom color? *</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="editCustomColor" value="no" checked onchange="toggleEditCustomColor()">
+                No
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="editCustomColor" value="yes" onchange="toggleEditCustomColor()">
+                Yes
+              </label>
+            </div>
+          </div>
+
+          <div id="editOrderNumberGroup" class="form-group" style="display:none;">
+            <label for="editOrderNumber">Order Number</label>
+            <input type="text" id="editOrderNumber" placeholder="e.g., 0238967">
+          </div>
+
+          <div class="form-group">
+            <label for="editPaintLine">Paint Line *</label>
+            <select id="editPaintLine" required>
+              <option value="">Select paint line</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="editSheen">Sheen/Finish *</label>
+            <select id="editSheen" required>
+              <option value="">Select sheen</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="editLocation">Area in Building</label>
+            <input type="text" id="editLocation" placeholder="e.g., Halls, Doorframes, etc.">
+          </div>
+
+          <div class="form-group">
+            <label for="editNotes">Notes (Optional)</label>
+            <textarea id="editNotes" placeholder="Any additional notes..."></textarea>
+          </div>
+
+          <button type="submit" class="submit-btn">Save Changes</button>
+        </form>
+        <div id="editSuccess" class="success-message" style="display:none;">
+          ✓ Paint updated successfully!
+        </div>
+      </main>
+    </div>
+
     <!-- Admin Panel Screen -->
     <div id="adminScreen" class="screen">
       <header>

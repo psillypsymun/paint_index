@@ -27,6 +27,9 @@ function showScreen(screenId) {
   if (screenId === 'entryScreen') {
     loadDropdownOptions();
   }
+  if (screenId === 'editScreen') {
+    loadEditDropdownOptions();
+  }
 }
 
 // Login
@@ -112,6 +115,48 @@ function populateDropdowns() {
     option.textContent = sheen;
     sheenSelect.appendChild(option);
   });
+}
+
+function loadEditDropdownOptions() {
+  Promise.all([
+    fetch('/api/options/building').then(r => r.json()),
+    fetch('/api/options/paint_line').then(r => r.json()),
+    fetch('/api/options/finish').then(r => r.json())
+  ])
+    .then(([buildings, paintLines, sheens]) => {
+      // Clear and populate edit dropdowns
+      const editBuildingSelect = document.getElementById('editBuilding');
+      const editPaintLineSelect = document.getElementById('editPaintLine');
+      const editSheenSelect = document.getElementById('editSheen');
+
+      // Clear existing options (keep placeholder)
+      editBuildingSelect.innerHTML = '<option value="">Select a building</option>';
+      editPaintLineSelect.innerHTML = '<option value="">Select paint line</option>';
+      editSheenSelect.innerHTML = '<option value="">Select sheen</option>';
+
+      // Add options
+      buildings.forEach(building => {
+        const option = document.createElement('option');
+        option.value = building;
+        option.textContent = building;
+        editBuildingSelect.appendChild(option);
+      });
+
+      paintLines.forEach(line => {
+        const option = document.createElement('option');
+        option.value = line;
+        option.textContent = line;
+        editPaintLineSelect.appendChild(option);
+      });
+
+      sheens.forEach(sheen => {
+        const option = document.createElement('option');
+        option.value = sheen;
+        option.textContent = sheen;
+        editSheenSelect.appendChild(option);
+      });
+    })
+    .catch(error => console.error('Error loading edit options:', error));
 }
 
 // Toggle custom color field
@@ -272,6 +317,9 @@ function searchPaints(type) {
             </div>
           ` : ''}
           <div class="archive-btn-container">
+            <button class="archive-btn" onclick="editPaint(${paint.id})" title="Edit this paint" style="background-color: #3b82f6;">
+              ✏️
+            </button>
             <button class="archive-btn" onclick="archivePaint(${paint.id}, '${escapeHtml(paint.paint_color)}')" title="Archive this paint">
               🗑️
             </button>
@@ -665,6 +713,101 @@ function deleteBuilding(buildingName) {
       console.error('Error:', error);
       alert('Error deleting building');
     });
+}
+
+// Edit Paint Functions
+let currentEditId = null;
+let previousScreen = null;
+
+function editPaint(paintId) {
+  currentEditId = paintId;
+  previousScreen = document.querySelector('.screen.active').id;
+
+  // Load the paint data
+  fetch(`/api/paints/${paintId}`)
+    .then(res => res.json())
+    .then(paint => {
+      // Populate form with existing data
+      document.getElementById('editBuilding').value = paint.building;
+      document.getElementById('editPaintName').value = paint.paint_color;
+      document.getElementById('editPaintLine').value = paint.paint_line;
+      document.getElementById('editSheen').value = paint.finish;
+      document.getElementById('editLocation').value = paint.location_in_building || '';
+      document.getElementById('editNotes').value = paint.notes || '';
+
+      // Set custom color radio
+      if (paint.custom_color) {
+        document.querySelector('input[name="editCustomColor"][value="yes"]').checked = true;
+        document.getElementById('editOrderNumberGroup').style.display = 'flex';
+        document.getElementById('editOrderNumber').value = paint.order_number || '';
+      } else {
+        document.querySelector('input[name="editCustomColor"][value="no"]').checked = true;
+        document.getElementById('editOrderNumberGroup').style.display = 'none';
+      }
+
+      showScreen('editScreen');
+    })
+    .catch(error => {
+      console.error('Error loading paint:', error);
+      alert('Error loading paint data');
+    });
+}
+
+function toggleEditCustomColor() {
+  const isCustom = document.querySelector('input[name="editCustomColor"]:checked').value === 'yes';
+  document.getElementById('editOrderNumberGroup').style.display = isCustom ? 'flex' : 'none';
+  if (!isCustom) {
+    document.getElementById('editOrderNumber').value = '';
+  }
+}
+
+function submitEditPaint(event) {
+  event.preventDefault();
+
+  const isCustom = document.querySelector('input[name="editCustomColor"]:checked').value === 'yes';
+
+  const paintData = {
+    building: document.getElementById('editBuilding').value,
+    paint_color: document.getElementById('editPaintName').value,
+    finish: document.getElementById('editSheen').value,
+    paint_line: document.getElementById('editPaintLine').value,
+    location_in_building: document.getElementById('editLocation').value,
+    custom_color: isCustom,
+    order_number: isCustom ? document.getElementById('editOrderNumber').value : null,
+    notes: document.getElementById('editNotes').value || null
+  };
+
+  fetch(`/api/paints/${currentEditId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(paintData)
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        const successDiv = document.getElementById('editSuccess');
+        successDiv.style.display = 'block';
+
+        setTimeout(() => {
+          successDiv.style.display = 'none';
+          showScreen(previousScreen);
+          // Reload data if on search or view all screen
+          if (previousScreen === 'searchScreen') {
+            loadAllPaints();
+          } else if (previousScreen === 'viewAllScreen') {
+            loadAndShowAllPaints();
+          }
+        }, 2000);
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Error updating paint');
+    });
+}
+
+function cancelEdit() {
+  showScreen(previousScreen);
 }
 
 // Database Export and Stats

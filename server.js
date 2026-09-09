@@ -172,6 +172,70 @@ app.post('/api/paints', async (req, res) => {
   }
 });
 
+// Update existing paint
+app.put('/api/paints/:id', async (req, res) => {
+  const { id } = req.params;
+  const {
+    building,
+    paint_color,
+    finish,
+    paint_line,
+    location_in_building,
+    custom_color,
+    order_number,
+    notes
+  } = req.body;
+
+  try {
+    await pool.query(
+      `UPDATE paints SET
+        building = $1,
+        paint_color = $2,
+        finish = $3,
+        paint_line = $4,
+        location_in_building = $5,
+        custom_color = $6,
+        order_number = $7,
+        notes = $8,
+        paint_name = $9
+      WHERE id = $10`,
+      [
+        building,
+        paint_color,
+        finish,
+        paint_line,
+        location_in_building,
+        custom_color || false,
+        order_number || null,
+        notes || null,
+        paint_color.toUpperCase(),
+        id
+      ]
+    );
+
+    res.json({ success: true, message: 'Paint updated' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get single paint by ID
+app.get('/api/paints/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      'SELECT * FROM paints WHERE id = $1 AND archived = FALSE',
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Paint not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get distinct values for dropdowns (excluding disabled)
 app.get('/api/options/:field', async (req, res) => {
   const field = req.params.field;
