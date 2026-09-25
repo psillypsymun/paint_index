@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "import-data": "node import-data.js"
+    "import-data": "node import-postgres.js"
   },
   "keywords": [],
   "author": "",

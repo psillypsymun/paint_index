@@ -9,38 +9,163 @@ A mobile-friendly web application for managing paint color inventory across mult
 - **Custom Color Support**: Track custom color orders with order numbers
 - **Search Functionality**: Search existing paints by color name or building
 - **Mobile Responsive**: Works seamlessly on phones, tablets, and desktop browsers
-- **Persistent Storage**: All data stored in SQLite database
+- **PostgreSQL Database**: Reliable, scalable data storage
+- **Admin Panel**: Manage dropdown options, archive entries, and download backups
+- **Automatic Backups**: Regular JSON backups with optional GitHub integration
 
-## Quick Start
+## Prerequisites
 
-### Prerequisites
-- Node.js (v14 or higher)
-- npm
+- **Node.js** v14 or higher
+- **npm** or **yarn**
+- **PostgreSQL** 12 or higher (running on your server)
 
-### Installation & Setup
+## Deployment Instructions (Self-Hosted)
 
-1. Navigate to the work directory:
-   ```bash
-   cd /Users/jeremy/Downloads/work
-   ```
+Follow these steps to install Paint Index on your network server.
 
-2. Install dependencies (if not already done):
-   ```bash
-   npm install
-   ```
+### Step 1: Set Up PostgreSQL Database
 
-3. Start the server:
-   ```bash
-   npm start
-   ```
+#### On Linux/Unix:
+```bash
+# Install PostgreSQL (if not already installed)
+sudo apt-get update
+sudo apt-get install postgresql postgresql-contrib
 
-   The app will be available at: `http://localhost:3000`
+# Start PostgreSQL service
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
 
-## Usage
+# Connect to PostgreSQL and create database and user
+sudo -u postgres psql
+```
+
+Then in the PostgreSQL prompt:
+```sql
+CREATE DATABASE paint_inventory;
+CREATE USER paintapp WITH PASSWORD 'secure_password_here';
+ALTER ROLE paintapp SET client_encoding TO 'utf8';
+ALTER ROLE paintapp SET default_transaction_isolation TO 'read committed';
+ALTER ROLE paintapp SET default_transaction_deferrable TO on;
+ALTER ROLE paintapp SET timezone TO 'UTC';
+GRANT ALL PRIVILEGES ON DATABASE paint_inventory TO paintapp;
+\q
+```
+
+#### On Windows:
+1. Download PostgreSQL installer from https://www.postgresql.org/download/windows/
+2. Run the installer and follow the setup wizard
+3. Note the password you set for the `postgres` user
+4. Use pgAdmin (included with installer) or Command Prompt:
+```bash
+psql -U postgres
+```
+
+Then create the database:
+```sql
+CREATE DATABASE paint_inventory;
+CREATE USER paintapp WITH PASSWORD 'secure_password_here';
+GRANT ALL PRIVILEGES ON DATABASE paint_inventory TO paintapp;
+\q
+```
+
+### Step 2: Clone the Repository
+
+```bash
+# Navigate to your desired location
+cd /var/www/apps  # or your preferred directory
+
+# Clone the repository
+git clone https://github.com/YOUR-USERNAME/paint-app.git
+cd paint-app
+
+# Install Node.js dependencies
+npm install
+```
+
+### Step 3: Configure Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your PostgreSQL connection details:
+
+```
+# PostgreSQL connection (adjust host, user, and password)
+DATABASE_URL=postgresql://paintapp:secure_password_here@localhost:5432/paint_inventory
+
+# Server port (optional, defaults to 3000)
+PORT=3000
+
+# Production mode
+NODE_ENV=production
+
+# Set a secure passphrase (CHANGE THIS!)
+PAINT_PASSPHRASE=your_very_secure_passphrase_here
+
+# Optional: GitHub backups (leave blank to disable)
+# GITHUB_REPO=YOUR-USERNAME/paint-app
+# GITHUB_TOKEN=your_github_personal_access_token
+```
+
+**Security Note:** Keep your `.env` file secure and never commit it to version control. The `.gitignore` file is already configured to exclude it.
+
+### Step 4: Import Data
+
+The app includes 136 paint entries in the backup file. To import them:
+
+```bash
+npm run import-data
+```
+
+This script will:
+- ✅ Connect to your PostgreSQL database
+- ✅ Create all necessary tables
+- ✅ Import all 136 paint entries with their data
+- ✅ Restore any disabled dropdown values
+
+### Step 5: Start the Server
+
+```bash
+npm start
+```
+
+You should see:
+```
+✓ Connected to PostgreSQL database
+✓ Database tables initialized
+Paint app server running at http://localhost:3000
+Passphrase: your_very_secure_passphrase_here
+```
+
+Access the app at: `http://localhost:3000`
+
+### Step 6: Set Up a Production Process Manager (Recommended)
+
+To keep the app running after you close the terminal, use PM2:
+
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# Start the app with PM2
+pm2 start server.js --name "paint-app"
+
+# Make it auto-start on server reboot
+pm2 startup
+pm2 save
+
+# View logs
+pm2 logs paint-app
+```
+
+## Usage Guide
 
 ### Initial Access
-1. Open `http://localhost:3000` in your browser
-2. Enter the passphrase (default: `paintapp123`)
+1. Open `http://your-server:3000` in your browser
+2. Enter the passphrase you set in `.env`
 3. You'll see the main menu
 
 ### Main Menu Options
@@ -48,50 +173,193 @@ A mobile-friendly web application for managing paint color inventory across mult
 #### Add New Paint
 - Select the building from the dropdown
 - Enter paint name/color
-- Specify if it's a custom color
-- If custom, enter the order number
+- Specify if it's a custom color (check if it's a special order)
+- If custom, enter the order number for future reordering
 - Select paint line and sheen
 - Enter the area/location in the building
-- Add optional notes
+- Add optional notes (e.g., special instructions, warnings)
 - Submit to save
 
 #### Search Paints
 - **By Color**: Search for paint names or colors
-- **By Building**: Search for all paints in a specific building
+- **By Building**: See all paints used in a specific building
 - View details including location, paint line, finish, and any notes
+
+#### Admin Panel
+- **Manage Dropdowns**: Disable specific building, paint line, or finish options
+- **Archive Paints**: Archive old/replaced paint entries (not deleted, just hidden)
+- **View Statistics**: See total paint count and database info
+- **Download Backups**: Export data as JSON or CSV for records
+- **Restore Backups**: Download previous backups from the automatic backup system
 
 ## Configuration
 
 ### Change the Passphrase
 
-**Option 1: Environment Variable (Recommended for deployment)**
+The easiest way is to update your `.env` file:
+
 ```bash
-PAINT_PASSPHRASE=your_new_passphrase npm start
+# Edit .env
+PAINT_PASSPHRASE=your_new_secure_passphrase
+
+# Restart the app
+pm2 restart paint-app
 ```
 
-**Option 2: Edit server.js**
-Edit line 9 in `server.js`:
-```javascript
-const PASSPHRASE = 'your_new_passphrase';
+### Network Access
+
+To allow other computers on your network to access the app:
+
+#### Option 1: Access via Server's IP Address
+1. Find your server's IP address:
+   - Linux: `hostname -I`
+   - Windows: `ipconfig` (look for IPv4 Address)
+
+2. Access from other computers: `http://SERVER_IP:3000`
+
+#### Option 2: Set Up a Domain Name (Advanced)
+Configure DNS pointing to your server's IP, then access via domain name.
+
+#### Option 3: Use a Reverse Proxy (Advanced)
+Set up Nginx or Apache to forward traffic from port 80/443 to your Node.js app.
+
+## Database Management
+
+### Create a Manual Backup
+
+The app automatically creates JSON backups every 6 months. To create one manually:
+
+1. Log in and go to Admin Panel
+2. Click "Download All Paints as JSON"
+
+Or from the command line:
+```bash
+npm run backup  # (if available)
 ```
 
-## Database
+### Restore from Backup
 
-- Database file: `paints.db` (created automatically)
-- Contains all paint entries with timestamps
-- Data persists between server restarts
+If you ever need to restore from a backup:
 
-### To Reset Data
+1. Delete the current data: `npm run import-data` will clear and reimport
+2. Replace the backup file in `backups/` with your previous backup
+3. Run `npm run import-data`
 
-Delete the `paints.db` file and re-run the import:
+### Database Maintenance
+
 ```bash
-rm paints.db
+# Connect to PostgreSQL and check database size
+sudo -u postgres psql
+\c paint_inventory
+SELECT pg_size_pretty(pg_database_size('paint_inventory'));
+```
+
+## API Endpoints
+
+These are available for integrations:
+
+- `POST /api/verify-passphrase` - Verify access passphrase
+- `GET /api/paints` - Get all paints
+- `GET /api/search?query=...&type=color|building` - Search paints
+- `POST /api/paints` - Add new paint entry
+- `PUT /api/paints/:id` - Edit a paint entry
+- `GET /api/paints/:id` - Get single paint entry
+- `POST /api/paints/:id/archive` - Archive a paint
+- `POST /api/paints/:id/unarchive` - Restore archived paint
+- `GET /api/options/:field` - Get dropdown options
+- `GET /api/admin/export` - Export all paints as JSON
+- `GET /api/admin/export-csv` - Export all paints as CSV
+
+## Tips
+
+- The app automatically populates dropdowns from existing database entries
+- Custom colors can track special order numbers for future reordering
+- Search is fuzzy-friendly (partial matches work)
+- Disabled dropdown options are hidden from the form but existing entries remain
+- Archived paints are hidden but not deleted and can be restored anytime
+- **Always change the default passphrase** before going live on your network!
+
+## Troubleshooting
+
+### Can't connect to PostgreSQL
+```bash
+# Check PostgreSQL is running
+sudo systemctl status postgresql  # Linux
+# or check Services on Windows
+
+# Verify connection string format
+postgresql://username:password@hostname:port/database
+
+# Test connection manually
+psql -U paintapp -d paint_inventory -h localhost
+```
+
+### Port 3000 already in use
+```bash
+# Use a different port
+PORT=3001 npm start
+# or change in .env file
+```
+
+### Import data fails
+```bash
+# Make sure DATABASE_URL is set and PostgreSQL is running
+echo $DATABASE_URL
+
+# Check PostgreSQL is accepting connections
+psql -U paintapp -d paint_inventory -h localhost -c "SELECT 1"
+
+# Run import with verbose output
 npm run import-data
 ```
 
-## Automatic Backups to GitHub
+### Need to see server logs
+```bash
+# With PM2
+pm2 logs paint-app
 
-The app can automatically push backups to your GitHub repository every 6 months!
+# Or run without PM2
+npm start
+```
+
+### Reset Everything and Start Fresh
+```bash
+# Drop the database and recreate it
+sudo -u postgres psql
+DROP DATABASE paint_inventory;
+CREATE DATABASE paint_inventory;
+GRANT ALL PRIVILEGES ON DATABASE paint_inventory TO paintapp;
+\q
+
+# Re-import the data
+npm run import-data
+
+# Restart the app
+pm2 restart paint-app
+```
+
+## Project Structure
+
+```
+paint-app/
+├── server.js                 # Express server with API endpoints
+├── import-postgres.js        # Script to import backup data into PostgreSQL
+├── package.json              # Dependencies
+├── .env                       # Environment variables (created by you)
+├── .env.example              # Example configuration
+├── .gitignore                # Git ignore rules (excludes .env)
+├── backups/                  # Directory for automatic backups
+│   └── paint-backup-*.json   # Backup files
+├── public/                   # Frontend files
+│   ├── index.html            # Main HTML file
+│   ├── styles.css            # Responsive styling
+│   └── app.js                # Frontend JavaScript logic
+└── README.md                 # This file
+```
+
+## Automatic Backups to GitHub (Optional)
+
+If you want automatic backups pushed to GitHub:
 
 ### Setup Instructions
 
@@ -102,95 +370,33 @@ The app can automatically push backups to your GitHub repository every 6 months!
 3. Click **Generate new token (classic)**
 4. Give it a name: `paint-app-backup`
 5. Check only: **repo** (Full control of private repositories)
-6. Click **Generate token**
-7. **Copy the token** (you'll only see it once!)
+6. Copy the token (you'll only see it once!)
 
-#### 2. Deploy to Render with Backups
-
-1. Push your code to GitHub (see below)
-2. Go to **render.com** and sign up/log in
-3. Click **New +** → **Web Service**
-4. Connect your GitHub account and select `paint-app` repo
-5. Fill in the form:
-   - **Name**: paint-app
-   - **Runtime**: Node
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start`
-6. Scroll to **Environment** and add:
-   ```
-   PAINT_PASSPHRASE = your-secure-passphrase-here
-   GITHUB_REPO = YOUR-USERNAME/paint-app
-   GITHUB_TOKEN = (paste your token from step 1)
-   ```
-7. Click **Create Web Service**
-8. Render will deploy automatically from GitHub!
-
-#### 3. Push Your Code to GitHub
-
-```bash
-cd ~/Downloads/work
-git init
-git add .
-git commit -m "Initial commit: Paint app with auto-backups"
-git branch -M main
-git remote add origin https://github.com/YOUR-USERNAME/paint-app.git
-git push -u origin main
-```
-
-### How Automatic Backups Work
-
-- ✅ Every 6 months, the app creates a backup automatically
-- ✅ Backup is pushed to your GitHub repo in a `backups/` folder
-- ✅ You can download any backup anytime from the Admin Panel
-- ✅ Full version history on GitHub - can restore from any point
-- ✅ Completely automatic - nothing to do!
-
-## Project Structure
+#### 2. Add to Your .env File
 
 ```
-work/
-├── server.js              # Express server with API endpoints
-├── import-data.js         # Script to import Excel data
-├── paints.db              # SQLite database (auto-created)
-├── package.json           # Dependencies
-└── public/
-    ├── index.html         # Main HTML file
-    ├── styles.css         # Responsive styling
-    └── app.js             # Frontend JavaScript logic
+GITHUB_REPO=YOUR-USERNAME/paint-app
+GITHUB_TOKEN=your_github_personal_access_token
 ```
 
-## API Endpoints
+#### 3. The App Will Automatically
 
-- `POST /api/verify-passphrase` - Verify access passphrase
-- `GET /api/paints` - Get all paints
-- `GET /api/search?query=...&type=color|building` - Search paints
-- `POST /api/paints` - Add new paint entry
-- `GET /api/options/:field` - Get dropdown options (building, paint_line, finish)
+- ✅ Create backups every 6 months
+- ✅ Push them to your GitHub repo in a `backups/` folder
+- ✅ You can restore any backup from the Admin Panel
+- ✅ Full version history on GitHub - recover from any point
 
-## Tips
+## Security Notes
 
-- The app automatically populates dropdowns from existing database entries
-- Custom colors can track special order numbers for reordering
-- Search is fuzzy-friendly (partial matches work)
-- The default passphrase is: `paintapp123` - change this immediately!
+- 🔒 **Change the default passphrase immediately**
+- 🔒 **Use a strong, unique passphrase** (mix of letters, numbers, symbols)
+- 🔒 **Keep your `.env` file private** - never commit it to Git
+- 🔒 **Use HTTPS in production** - set up a reverse proxy with SSL certificates
+- 🔒 **Restrict network access** - use firewall rules to limit who can access port 3000
 
-## Troubleshooting
+## Support
 
-**Port 3000 already in use?**
-```bash
-PORT=3001 npm start
-```
-
-**Need to see server logs?**
-```bash
-npm start
-# Look for connection messages and errors in the console
-```
-
-**Lost data?**
-- The database (`paints.db`) contains all data
-- Keep regular backups of this file
-- Data persists between server restarts
+For issues, questions, or feature requests, refer to the project documentation or contact your system administrator.
 
 ---
 
