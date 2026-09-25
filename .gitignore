@@ -1,6 +1,5 @@
 node_modules/
 paints.db
-backups/
 dbase_backup/
 *.log
 .env
