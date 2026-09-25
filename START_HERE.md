@@ -55,7 +55,7 @@ npm start
 ## 📊 What You're Getting
 
 ✅ **Database:** PostgreSQL (self-hosted, no monthly fees)  
-✅ **Data:** All 136 paint entries ready to import  
+✅ **Data:** All 306 paint entries ready to import  
 ✅ **App:** Node.js Express server  
 ✅ **Access:** Web browser on any network computer  
 ✅ **Backups:** Automatic backup system built-in  

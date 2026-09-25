@@ -19,17 +19,30 @@ const pool = new Pool({
 
 async function importData() {
   try {
-    // Read backup file
-    const backupPath = path.join(__dirname, 'backups', 'paint-backup-2026-09-08.json');
+    // Read backup file - try the complete 306-entry backup first, then fall back to 136-entry
+    let backupPath = path.join(__dirname, 'backups', 'paint-backup-complete-306-entries.json');
+    let data;
 
-    if (!fs.existsSync(backupPath)) {
-      console.error(`ERROR: Backup file not found at ${backupPath}`);
-      process.exit(1);
+    if (fs.existsSync(backupPath)) {
+      console.log(`Using complete backup with all entries: ${backupPath}`);
+      const backupContent = fs.readFileSync(backupPath, 'utf-8');
+      data = JSON.parse(backupContent);
+    } else {
+      // Fall back to older backup if complete one not found
+      backupPath = path.join(__dirname, 'backups', 'paint-backup-2026-09-08.json');
+      console.log(`Using legacy backup: ${backupPath}`);
+
+      if (!fs.existsSync(backupPath)) {
+        console.error(`ERROR: No backup file found. Checked:`);
+        console.error(`  - ${path.join(__dirname, 'backups', 'paint-backup-complete-306-entries.json')}`);
+        console.error(`  - ${backupPath}`);
+        process.exit(1);
+      }
+
+      const backupContent = fs.readFileSync(backupPath, 'utf-8');
+      const backup = JSON.parse(backupContent);
+      data = backup.data;
     }
-
-    const backupContent = fs.readFileSync(backupPath, 'utf-8');
-    const backup = JSON.parse(backupContent);
-    const data = backup.data;
 
     console.log(`Found ${data.length} entries to import`);
 

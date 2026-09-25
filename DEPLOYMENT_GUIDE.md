@@ -115,7 +115,7 @@ Save the file (Ctrl+O, Enter, Ctrl+X in nano).
 
 #### Step 5: Import the Data
 
-The app comes with 136 paint entries ready to import:
+The app comes with **306 paint entries** ready to import:
 
 ```bash
 npm run import-data
@@ -123,11 +123,11 @@ npm run import-data
 
 You should see:
 ```
-Found 136 entries to import
+Using complete backup with all entries: backups/paint-backup-complete-306-entries.json
 ✓ Database tables initialized
 ✓ Cleared existing paint entries
-Imported: 136/136
-✓ Import complete! 136 entries added to database.
+Imported: 306/306
+✓ Import complete! 306 entries added to database.
 ```
 
 #### Step 6: Start the Application

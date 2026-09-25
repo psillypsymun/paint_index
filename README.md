@@ -114,7 +114,7 @@ PAINT_PASSPHRASE=your_very_secure_passphrase_here
 
 ### Step 4: Import Data
 
-The app includes 136 paint entries in the backup file. To import them:
+The app includes 306 paint entries in the backup file. To import them:
 
 ```bash
 npm run import-data
@@ -123,7 +123,7 @@ npm run import-data
 This script will:
 - ✅ Connect to your PostgreSQL database
 - ✅ Create all necessary tables
-- ✅ Import all 136 paint entries with their data
+- ✅ Import all 306 paint entries with their data
 - ✅ Restore any disabled dropdown values
 
 ### Step 5: Start the Server

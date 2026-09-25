@@ -60,7 +60,7 @@ Your boss will need to set these in the `.env` file:
 
 ## Data Migration
 
-All 136 paint entries from your current database are included:
+All 306 paint entries from your current database are included:
 - **Backup file:** `backups/paint-backup-2026-09-08.json`
 - **Import script:** `npm run import-data` (runs automatically during setup)
 - **No manual data entry needed!**

@@ -66,8 +66,8 @@ npm run import-data
 You should see:
 ```
 ✓ Database tables initialized
-Imported: 136/136
-✓ Import complete! 136 entries added to database.
+Imported: 306/306
+✓ Import complete! 306 entries added to database.
 ```
 
 ## Step 6: Start App (2 min)
