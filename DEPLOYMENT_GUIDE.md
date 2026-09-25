@@ -113,9 +113,9 @@ PAINT_PASSPHRASE=CHANGE_TO_YOUR_SECURE_PASSPHRASE
 
 Save the file (Ctrl+O, Enter, Ctrl+X in nano).
 
-#### Step 5: Import the Data
+#### Step 5: Import All Your Paint Data
 
-The app comes with **306 paint entries** ready to import:
+The app includes a backup file with all **306 paint entries**. Import them with one command:
 
 ```bash
 npm run import-data
@@ -129,6 +129,8 @@ Using complete backup with all entries: backups/paint-backup-complete-306-entrie
 Imported: 306/306
 ✓ Import complete! 306 entries added to database.
 ```
+
+**That's it!** All your paint data is now in the PostgreSQL database. No manual data entry needed.
 
 #### Step 6: Start the Application
 

@@ -57,14 +57,17 @@ PORT=3000
 
 Save: `Ctrl+O`, `Enter`, `Ctrl+X`
 
-## Step 5: Import Data (2 min)
+## Step 5: Import Your Paint Data (2 min)
 
 ```bash
 npm run import-data
 ```
 
+This imports all 306 paint entries from the backup file into PostgreSQL.
+
 You should see:
 ```
+Using complete backup with all entries: backups/paint-backup-complete-306-entries.json
 ✓ Database tables initialized
 Imported: 306/306
 ✓ Import complete! 306 entries added to database.

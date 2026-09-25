@@ -343,13 +343,14 @@ pm2 restart paint-app
 ```
 paint-app/
 ├── server.js                 # Express server with API endpoints
-├── import-postgres.js        # Script to import backup data into PostgreSQL
+├── import-data.js            # Script to import backup data into PostgreSQL
 ├── package.json              # Dependencies
 ├── .env                       # Environment variables (created by you)
 ├── .env.example              # Example configuration
 ├── .gitignore                # Git ignore rules (excludes .env)
-├── backups/                  # Directory for automatic backups
-│   └── paint-backup-*.json   # Backup files
+├── backups/                  # Directory for backups
+│   ├── paint-backup-complete-306-entries.json  # Primary backup (all data)
+│   └── paint-backup-*.json                     # Additional backups
 ├── public/                   # Frontend files
 │   ├── index.html            # Main HTML file
 │   ├── styles.css            # Responsive styling
